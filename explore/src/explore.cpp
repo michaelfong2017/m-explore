@@ -39,6 +39,13 @@
 
 #include <thread>
 
+#include "geometry_msgs/Pose.h"
+#include "mongodb_store/message_store.h"
+
+using namespace geometry_msgs;
+using namespace mongodb_store;
+using namespace std;
+
 inline static bool operator==(const geometry_msgs::Point& one,
                               const geometry_msgs::Point& two)
 {
@@ -180,6 +187,18 @@ void Explore::makePlan()
 {
   // find frontiers
   auto pose = costmap_client_.getRobotPose();
+
+  ros::NodeHandle nh;
+  MessageStoreProxy messageStore(nh);
+
+  Pose p;
+  p.position.z = 666;
+  string name("my pose");
+  ROS_DEBUG("Name: %s, z: %f", name, p.position.z);
+  string id(messageStore.insertNamed(name, p));
+  messageStore.updateID(id, p);
+  assert(messageStore.queryID<Pose>(id).first->position.z == 666);
+  
   // get frontiers sorted according to cost
   auto frontiers = search_.searchFrom(pose.position);
   ROS_DEBUG("found %lu frontiers", frontiers.size());
