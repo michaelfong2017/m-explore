@@ -36,6 +36,7 @@
  *********************************************************************/
 
 #include <explore/explore.h>
+#include <nav_msgs/GetPlan.h>
 
 #include <thread>
 
@@ -185,20 +186,24 @@ void Explore::visualizeFrontiers(
 
 void Explore::makePlan()
 {
+  // Called every 3 seconds for each robot
+  ROS_DEBUG("\n\nmakePlan\n%d\n", ros::Time::now().sec);
+  // return;
+
   // find frontiers
   auto pose = costmap_client_.getRobotPose();
 
-  ros::NodeHandle nh;
-  MessageStoreProxy messageStore(nh);
+  // ros::NodeHandle nh;
+  // MessageStoreProxy messageStore(nh);
 
-  Pose p;
-  p.position.z = 666;
-  string name("my pose");
-  ROS_DEBUG("Name: %s, z: %f", name, p.position.z);
-  string id(messageStore.insertNamed(name, p));
-  messageStore.updateID(id, p);
-  assert(messageStore.queryID<Pose>(id).first->position.z == 666);
-  
+  // Pose p;
+  // p.position.z = 666;
+  // string name("my pose");
+  // ROS_DEBUG("Name: %s, z: %f", name, p.position.z);
+  // string id(messageStore.insertNamed(name, p));
+  // messageStore.updateID(id, p);
+  // assert(messageStore.queryID<Pose>(id).first->position.z == 666);
+
   // get frontiers sorted according to cost
   auto frontiers = search_.searchFrom(pose.position);
   ROS_DEBUG("found %lu frontiers", frontiers.size());
@@ -248,6 +253,59 @@ void Explore::makePlan()
   if (same_goal) {
     return;
   }
+
+  /* My code overriding target_position */
+  ros::ServiceClient client = private_nh_.serviceClient<nav_msgs::GetPlan>(ros::this_node::getNamespace() + "/move_base/NavfnROS/make_plan");
+  nav_msgs::GetPlan srv;
+
+  geometry_msgs::PoseStamped start;
+  geometry_msgs::Point start_pose;
+  start_pose.x = 1.0f;
+  start_pose.y = 3.0f;
+  start_pose.z = 0.0f;
+  start.pose.position = start_pose;
+  start.pose.orientation.w = 1.;
+  start.header.frame_id = "map";
+  start.header.stamp = ros::Time::now();
+  srv.request.start = start;
+
+  geometry_msgs::PoseStamped end;
+  geometry_msgs::Point end_pose;
+  end_pose.x = 1.0f;
+  end_pose.y = 0.0f;
+  end_pose.z = 0.0f;
+  end.pose.position = end_pose;
+  end.pose.orientation.w = 1.;
+  end.header.frame_id = "map";
+  end.header.stamp = ros::Time::now();
+  srv.request.goal = end;
+
+  srv.request.tolerance = 0.5f;
+
+  if (client.call(srv)) {
+    ROS_INFO("Response received");
+
+    nav_msgs::Path plan = srv.response.plan;
+
+    ROS_INFO("Plan received");
+
+
+    for (auto it = plan.poses.begin(); it != plan.poses.end(); ++it) {
+      double x = it->pose.position.x;
+      double y = it->pose.position.y;
+      double z = it->pose.position.z;
+
+      ROS_INFO("x: %f, y: %f, z: %f", x, y, z);
+    }
+  } else {
+    ROS_ERROR("Failed to call service make_plan");
+  }
+
+  // geometry_msgs::Point p;
+  // p.x = 1.0f;
+  // p.y = 2.0f;
+  // p.z = 0.0f;
+  // target_position = p;
 
   // send goal to move_base if we have something new to pursue
   move_base_msgs::MoveBaseGoal goal;

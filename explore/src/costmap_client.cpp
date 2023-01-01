@@ -114,6 +114,7 @@ Costmap2DClient::Costmap2DClient(ros::NodeHandle& param_nh,
 
 void Costmap2DClient::updateFullMap(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
+  // /tb3_0/tb3_0/map
   global_frame_ = msg->header.frame_id;
 
   unsigned int size_in_cells_x = msg->info.width;
@@ -193,6 +194,7 @@ geometry_msgs::Pose Costmap2DClient::getRobotPose() const
   global_pose.setIdentity();
   tf::Stamped<tf::Pose> robot_pose;
   robot_pose.setIdentity();
+  // /tb3_0/base_link
   robot_pose.frame_id_ = robot_base_frame_;
   robot_pose.stamp_ = ros::Time();
   ros::Time current_time =
