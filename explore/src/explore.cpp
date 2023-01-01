@@ -233,6 +233,12 @@ void Explore::makePlan()
   }
   geometry_msgs::Point target_position = frontier->centroid;
 
+  // TODO use service from Traceback to get target_position
+  // If the queue is empty, override nothing, if there exists goal, override frontier
+  // min_distance should be the distance between robot and goal.
+  // min_distance should be calculated every pass to see whether there is progress
+  // TODO need to override target_position and frontier->min_distance
+
   // time out if we are not making any progress
   bool same_goal = prev_goal_ == target_position;
   prev_goal_ = target_position;
@@ -347,6 +353,8 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
     frontier_blacklist_.push_back(frontier_goal);
     ROS_DEBUG("Adding current goal to black list");
   }
+
+  // TODO use service from Traceback to update the queue there, i.e. remove the reached goal.
 
   // find new goal immediatelly regardless of planning frequency.
   // execute via timer to prevent dead lock in move_base_client (this is
