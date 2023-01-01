@@ -212,8 +212,36 @@ void Explore::makePlan()
   }
 
   if (frontiers.empty()) {
-    stop();
-    return;
+    // stop();
+    // return;
+
+    // In order to test in bigger maps, instead of stopping exploration,
+    // command the robot to randomly move in a direction.
+    frontier_exploration::Frontier frontier;
+    geometry_msgs::Point random_point;
+    int r = rand() % 4;
+    switch (r) {
+      case 0:
+        random_point.x = 5.0;
+        random_point.y = 0.0;
+        break;
+      case 1:
+        random_point.x = -5.0;
+        random_point.y = 0.0;
+        break;
+      case 2:
+        random_point.x = 0.0;
+        random_point.y = 5.0;
+        break;
+      case 3:
+        random_point.x = 0.0;
+        random_point.y = -5.0;
+        break;
+    }
+    random_point.z = 0.0;
+    frontier.centroid = random_point;
+    frontier.min_distance = 5.0;
+    frontiers.emplace_back(frontier);
   }
 
   // publish frontiers as visualization markers
@@ -228,15 +256,42 @@ void Explore::makePlan()
                          return goalOnBlacklist(f.centroid);
                        });
   if (frontier == frontiers.end()) {
-    stop();
-    return;
+    // stop();
+    // return;
+
+    // In order to test in bigger maps, instead of stopping exploration,
+    // command the robot to randomly move in a direction.
+    geometry_msgs::Point random_point;
+    int r = rand() % 4;
+    switch (r) {
+      case 0:
+        random_point.x = 5.0;
+        random_point.y = 0.0;
+        break;
+      case 1:
+        random_point.x = -5.0;
+        random_point.y = 0.0;
+        break;
+      case 2:
+        random_point.x = 0.0;
+        random_point.y = 5.0;
+        break;
+      case 3:
+        random_point.x = 0.0;
+        random_point.y = -5.0;
+        break;
+    }
+    random_point.z = 0.0;
+    frontier->centroid = random_point;
+    frontier->min_distance = 5.0;
   }
   geometry_msgs::Point target_position = frontier->centroid;
 
   // TODO use service from Traceback to get target_position
-  // If the queue is empty, override nothing, if there exists goal, override frontier
-  // min_distance should be the distance between robot and goal.
-  // min_distance should be calculated every pass to see whether there is progress
+  // If the queue is empty, override nothing, if there exists goal, override
+  // frontier min_distance should be the distance between robot and goal.
+  // min_distance should be calculated every pass to see whether there is
+  // progress
   // TODO need to override target_position and frontier->min_distance
 
   // time out if we are not making any progress
@@ -261,7 +316,8 @@ void Explore::makePlan()
   }
 
   /* My code overriding target_position */
-  ros::ServiceClient client = private_nh_.serviceClient<nav_msgs::GetPlan>(ros::this_node::getNamespace() + "/move_base/NavfnROS/make_plan");
+  ros::ServiceClient client = private_nh_.serviceClient<nav_msgs::GetPlan>(
+      ros::this_node::getNamespace() + "/move_base/NavfnROS/make_plan");
   nav_msgs::GetPlan srv;
 
   geometry_msgs::PoseStamped start;
@@ -294,7 +350,6 @@ void Explore::makePlan()
     nav_msgs::Path plan = srv.response.plan;
 
     ROS_INFO("Plan received");
-
 
     for (auto it = plan.poses.begin(); it != plan.poses.end(); ++it) {
       double x = it->pose.position.x;
@@ -354,7 +409,8 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
     ROS_DEBUG("Adding current goal to black list");
   }
 
-  // TODO use service from Traceback to update the queue there, i.e. remove the reached goal.
+  // TODO use service from Traceback to update the queue there, i.e. remove the
+  // reached goal.
 
   // find new goal immediatelly regardless of planning frequency.
   // execute via timer to prevent dead lock in move_base_client (this is
