@@ -37,19 +37,18 @@
 #ifndef NAV_EXPLORE_H_
 #define NAV_EXPLORE_H_
 
-#include <memory>
-#include <mutex>
-#include <string>
-#include <vector>
-
 #include <actionlib/client/simple_action_client.h>
+#include <explore/costmap_client.h>
+#include <explore/frontier_search.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <move_base_msgs/MoveBaseAction.h>
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
 
-#include <explore/costmap_client.h>
-#include <explore/frontier_search.h>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
 
 namespace explore
 {
@@ -85,6 +84,14 @@ private:
 
   bool goalOnBlacklist(const geometry_msgs::Point& goal);
 
+  // e.g. return "/tb3_0"
+  std::string getRobotName()
+  {
+    return ros::this_node::getNamespace();
+  }
+
+  void tracebackGoalUpdate(const move_base_msgs::MoveBaseGoalConstPtr &msg);
+
   ros::NodeHandle private_nh_;
   ros::NodeHandle relative_nh_;
   ros::Publisher marker_array_publisher_;
@@ -103,12 +110,17 @@ private:
   ros::Time last_progress_;
   size_t last_markers_count_;
 
+  ros::Subscriber traceback_goal_subscriber_;
+  std::string traceback_goal_topic_ = "traceback/goal";
+  bool in_traceback_ = false;
+  move_base_msgs::MoveBaseGoal current_traceback_goal_;
+
   // parameters
   double planner_frequency_;
   double potential_scale_, orientation_scale_, gain_scale_;
   ros::Duration progress_timeout_;
   bool visualize_;
 };
-}
+}  // namespace explore
 
 #endif

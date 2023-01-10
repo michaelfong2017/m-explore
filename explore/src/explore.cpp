@@ -93,6 +93,13 @@ Explore::Explore()
   exploring_timer_ =
       relative_nh_.createTimer(ros::Duration(1. / planner_frequency_),
                                [this](const ros::TimerEvent&) { makePlan(); });
+
+  traceback_goal_subscriber_ =
+      private_nh_.subscribe<move_base_msgs::MoveBaseGoal>(
+          ros::names::append(getRobotName(), traceback_goal_topic_), 10,
+          [this](const move_base_msgs::MoveBaseGoalConstPtr& msg) {
+            tracebackGoalUpdate(msg);
+          });
 }
 
 Explore::~Explore()
@@ -255,7 +262,26 @@ void Explore::makePlan()
                        [this](const frontier_exploration::Frontier& f) {
                          return goalOnBlacklist(f.centroid);
                        });
-  if (frontier == frontiers.end()) {
+
+  // TODO use topic from Traceback to get frontier->centroid
+  // If the queue is empty, override nothing, if there exists goal, override
+  // frontier min_distance should be the distance between robot and goal.
+  // min_distance should be calculated every pass to see whether there is
+  // progress
+  // TODO need to override frontier->centroid and frontier->min_distance
+  bool traceback_goal_in_blacklist = false;
+  if (in_traceback_) {
+    frontier->centroid = current_traceback_goal_.target_pose.pose.position;
+    frontier->min_distance = sqrt(
+        pow((double(pose.position.x) - double(frontier->centroid.x)), 2.0) +
+        pow((double(pose.position.y) - double(frontier->centroid.y)), 2.0));
+    if (goalOnBlacklist(frontier->centroid)) {
+      ROS_DEBUG("traceback goal is on blacklist");
+      traceback_goal_in_blacklist = true;
+    }
+  }
+
+  if (frontier == frontiers.end() || traceback_goal_in_blacklist) {
     // stop();
     // return;
 
@@ -285,14 +311,8 @@ void Explore::makePlan()
     frontier->centroid = random_point;
     frontier->min_distance = 5.0;
   }
-  geometry_msgs::Point target_position = frontier->centroid;
 
-  // TODO use service from Traceback to get target_position
-  // If the queue is empty, override nothing, if there exists goal, override
-  // frontier min_distance should be the distance between robot and goal.
-  // min_distance should be calculated every pass to see whether there is
-  // progress
-  // TODO need to override target_position and frontier->min_distance
+  geometry_msgs::Point target_position = frontier->centroid;
 
   // time out if we are not making any progress
   bool same_goal = prev_goal_ == target_position;
@@ -316,51 +336,51 @@ void Explore::makePlan()
   }
 
   /* My code overriding target_position */
-  ros::ServiceClient client = private_nh_.serviceClient<nav_msgs::GetPlan>(
-      ros::this_node::getNamespace() + "/move_base/NavfnROS/make_plan");
-  nav_msgs::GetPlan srv;
+  // ros::ServiceClient client = private_nh_.serviceClient<nav_msgs::GetPlan>(
+  //     ros::this_node::getNamespace() + "/move_base/NavfnROS/make_plan");
+  // nav_msgs::GetPlan srv;
 
-  geometry_msgs::PoseStamped start;
-  geometry_msgs::Point start_pose;
-  start_pose.x = 1.0f;
-  start_pose.y = 3.0f;
-  start_pose.z = 0.0f;
-  start.pose.position = start_pose;
-  start.pose.orientation.w = 1.;
-  start.header.frame_id = "map";
-  start.header.stamp = ros::Time::now();
-  srv.request.start = start;
+  // geometry_msgs::PoseStamped start;
+  // geometry_msgs::Point start_pose;
+  // start_pose.x = 1.0f;
+  // start_pose.y = 3.0f;
+  // start_pose.z = 0.0f;
+  // start.pose.position = start_pose;
+  // start.pose.orientation.w = 1.;
+  // start.header.frame_id = "map";
+  // start.header.stamp = ros::Time::now();
+  // srv.request.start = start;
 
-  geometry_msgs::PoseStamped end;
-  geometry_msgs::Point end_pose;
-  end_pose.x = 1.0f;
-  end_pose.y = 0.0f;
-  end_pose.z = 0.0f;
-  end.pose.position = end_pose;
-  end.pose.orientation.w = 1.;
-  end.header.frame_id = "map";
-  end.header.stamp = ros::Time::now();
-  srv.request.goal = end;
+  // geometry_msgs::PoseStamped end;
+  // geometry_msgs::Point end_pose;
+  // end_pose.x = 1.0f;
+  // end_pose.y = 0.0f;
+  // end_pose.z = 0.0f;
+  // end.pose.position = end_pose;
+  // end.pose.orientation.w = 1.;
+  // end.header.frame_id = "map";
+  // end.header.stamp = ros::Time::now();
+  // srv.request.goal = end;
 
-  srv.request.tolerance = 0.5f;
+  // srv.request.tolerance = 0.5f;
 
-  if (client.call(srv)) {
-    ROS_INFO("Response received");
+  // if (client.call(srv)) {
+  //   ROS_INFO("Response received");
 
-    nav_msgs::Path plan = srv.response.plan;
+  //   nav_msgs::Path plan = srv.response.plan;
 
-    ROS_INFO("Plan received");
+  //   ROS_INFO("Plan received");
 
-    for (auto it = plan.poses.begin(); it != plan.poses.end(); ++it) {
-      double x = it->pose.position.x;
-      double y = it->pose.position.y;
-      double z = it->pose.position.z;
+  //   for (auto it = plan.poses.begin(); it != plan.poses.end(); ++it) {
+  //     double x = it->pose.position.x;
+  //     double y = it->pose.position.y;
+  //     double z = it->pose.position.z;
 
-      ROS_INFO("x: %f, y: %f, z: %f", x, y, z);
-    }
-  } else {
-    ROS_ERROR("Failed to call service make_plan");
-  }
+  //     ROS_INFO("x: %f, y: %f, z: %f", x, y, z);
+  //   }
+  // } else {
+  //   ROS_ERROR("Failed to call service make_plan");
+  // }
 
   // geometry_msgs::Point p;
   // p.x = 1.0f;
@@ -399,6 +419,16 @@ bool Explore::goalOnBlacklist(const geometry_msgs::Point& goal)
   return false;
 }
 
+void Explore::tracebackGoalUpdate(
+    const move_base_msgs::MoveBaseGoalConstPtr& msg)
+{
+  ROS_INFO("tracebackGoalUpdate");
+  if (!in_traceback_) {
+    in_traceback_ = true;
+    current_traceback_goal_ = *msg;
+  }
+}
+
 void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
                           const move_base_msgs::MoveBaseResultConstPtr&,
                           const geometry_msgs::Point& frontier_goal)
@@ -411,6 +441,10 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
 
   // TODO use service from Traceback to update the queue there, i.e. remove the
   // reached goal.
+  if (in_traceback_) {
+    in_traceback_ = false;
+    ROS_INFO("Reached goal with status: %s", status.toString().c_str());
+  }
 
   // find new goal immediatelly regardless of planning frequency.
   // execute via timer to prevent dead lock in move_base_client (this is
