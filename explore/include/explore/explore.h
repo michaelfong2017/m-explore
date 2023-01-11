@@ -37,6 +37,9 @@
 #ifndef NAV_EXPLORE_H_
 #define NAV_EXPLORE_H_
 
+#include <traceback_msgs/GoalAndImage.h>
+#include <traceback_msgs/ImageAndImage.h>
+
 #include <actionlib/client/simple_action_client.h>
 #include <explore/costmap_client.h>
 #include <explore/frontier_search.h>
@@ -90,7 +93,7 @@ private:
     return ros::this_node::getNamespace();
   }
 
-  void tracebackGoalUpdate(const move_base_msgs::MoveBaseGoalConstPtr &msg);
+  void tracebackGoalAndImageUpdate(const traceback_msgs::GoalAndImage::ConstPtr& msg);
 
   ros::NodeHandle private_nh_;
   ros::NodeHandle relative_nh_;
@@ -110,10 +113,13 @@ private:
   ros::Time last_progress_;
   size_t last_markers_count_;
 
-  ros::Subscriber traceback_goal_subscriber_;
-  std::string traceback_goal_topic_ = "traceback/goal";
+  ros::Subscriber traceback_goal_and_image_subscriber_;
+  std::string traceback_goal_and_image_topic_ = "traceback/goal_and_image";
+  ros::Publisher traceback_image_and_image_publisher_;
+  std::string traceback_image_and_image_topic_ = "traceback/image_and_image";
   bool in_traceback_ = false;
   move_base_msgs::MoveBaseGoal current_traceback_goal_;
+  sensor_msgs::Image current_image_;
 
   // parameters
   double planner_frequency_;

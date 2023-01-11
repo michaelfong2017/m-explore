@@ -94,12 +94,21 @@ Explore::Explore()
       relative_nh_.createTimer(ros::Duration(1. / planner_frequency_),
                                [this](const ros::TimerEvent&) { makePlan(); });
 
-  traceback_goal_subscriber_ =
-      private_nh_.subscribe<move_base_msgs::MoveBaseGoal>(
-          ros::names::append(getRobotName(), traceback_goal_topic_), 10,
-          [this](const move_base_msgs::MoveBaseGoalConstPtr& msg) {
-            tracebackGoalUpdate(msg);
+  // Note that private_nh_ is for example under /tb3_0/explore, but I want
+  // /tb3_0/traceback/goal_and_image instead.
+  traceback_goal_and_image_subscriber_ =
+      private_nh_.subscribe<traceback_msgs::GoalAndImage>(
+          ros::names::append(getRobotName(), traceback_goal_and_image_topic_),
+          10, [this](const traceback_msgs::GoalAndImage::ConstPtr& msg) {
+            tracebackGoalAndImageUpdate(msg);
           });
+
+  // Note that private_nh_ is for example under /tb3_0/explore, but I want
+  // /tb3_0/traceback/image_and_image instead.
+  traceback_image_and_image_publisher_ =
+      private_nh_.advertise<traceback_msgs::ImageAndImage>(
+          ros::names::append(getRobotName(), traceback_image_and_image_topic_),
+          10);
 }
 
 Explore::~Explore()
@@ -419,13 +428,14 @@ bool Explore::goalOnBlacklist(const geometry_msgs::Point& goal)
   return false;
 }
 
-void Explore::tracebackGoalUpdate(
-    const move_base_msgs::MoveBaseGoalConstPtr& msg)
+void Explore::tracebackGoalAndImageUpdate(
+    const traceback_msgs::GoalAndImage::ConstPtr& msg)
 {
-  ROS_INFO("tracebackGoalUpdate");
+  ROS_INFO("tracebackGoalAndImageUpdate");
   if (!in_traceback_) {
     in_traceback_ = true;
-    current_traceback_goal_ = *msg;
+    current_traceback_goal_ = msg->goal;
+    current_image_ = msg->image;
   }
 }
 
@@ -439,11 +449,14 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
     ROS_DEBUG("Adding current goal to black list");
   }
 
-  // TODO use service from Traceback to update the queue there, i.e. remove the
-  // reached goal.
   if (in_traceback_) {
     in_traceback_ = false;
     ROS_INFO("Reached goal with status: %s", status.toString().c_str());
+    traceback_msgs::ImageAndImage images;
+    images.traced_image = current_image_;
+    // TODO also capture current image and send
+    images.tracer_image = current_image_;
+    traceback_image_and_image_publisher_.publish(images);
   }
 
   // find new goal immediatelly regardless of planning frequency.

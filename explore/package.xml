@@ -30,6 +30,7 @@
   <depend>costmap_2d</depend>
   <depend>actionlib</depend>
   <depend>mongodb_store</depend>
+  <depend>traceback_msgs</depend>
 
   <test_depend>roslaunch</test_depend>
 </package>

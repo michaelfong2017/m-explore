@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   tf
+  traceback_msgs
   visualization_msgs
   mongodb_store
 )
