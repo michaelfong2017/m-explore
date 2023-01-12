@@ -412,23 +412,30 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
       in_traceback_ = false;
     }
   } else if (in_traceback_) {
-    ROS_INFO("Reached goal with status: %s", status.toString().c_str());
-    traceback_msgs::ImageAndImage images;
-    images.traced_image = current_traced_robot_image_;
-    // TODO also capture current image and send
-    images.tracer_image = current_image_;
-    traceback_image_and_image_publisher_.publish(images);
-
     in_traceback_ = false;
-  }
 
-  // find new goal immediatelly regardless of planning frequency.
-  // execute via timer to prevent dead lock in move_base_client (this is
-  // callback for sendGoal, which is called in makePlan). the timer must live
-  // until callback is executed.
-  oneshot_ = relative_nh_.createTimer(
-      ros::Duration(0, 0), [this](const ros::TimerEvent&) { makePlan(); },
-      true);
+    ROS_INFO("Reached goal with status: %s", status.toString().c_str());
+
+    oneshot_ = relative_nh_.createTimer(
+        ros::Duration(1, 0),
+        [this](const ros::TimerEvent&) {
+          traceback_msgs::ImageAndImage images;
+          images.traced_image = current_traced_robot_image_;
+          // TODO also capture current image and send
+          images.tracer_image = current_image_;
+          traceback_image_and_image_publisher_.publish(images);
+          makePlan();
+        },
+        true);
+  } else {
+    // find new goal immediatelly regardless of planning frequency.
+    // execute via timer to prevent dead lock in move_base_client (this is
+    // callback for sendGoal, which is called in makePlan). the timer must live
+    // until callback is executed.
+    oneshot_ = relative_nh_.createTimer(
+        ros::Duration(0, 0), [this](const ros::TimerEvent&) { makePlan(); },
+        true);
+  }
 }
 
 void Explore::start()
