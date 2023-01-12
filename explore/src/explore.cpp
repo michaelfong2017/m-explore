@@ -392,6 +392,7 @@ void Explore::tracebackGoalAndImageUpdate(
     in_traceback_ = true;
     current_traceback_goal_ = msg->goal;
     current_traced_robot_image_ = msg->image;
+    current_traced_robot_ = msg->traced_robot;
     current_traced_robot_stamp_ = msg->stamp;
   }
 }
@@ -424,7 +425,7 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
           images.traced_image = current_traced_robot_image_;
           // TODO also capture current image and send
           images.tracer_image = current_image_;
-          images.robot_name = getRobotName();
+          images.robot_name = current_traced_robot_;
           images.stamp = current_traced_robot_stamp_;
           traceback_image_and_image_publisher_.publish(images);
           makePlan();
