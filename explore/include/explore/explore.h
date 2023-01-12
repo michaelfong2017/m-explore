@@ -37,15 +37,14 @@
 #ifndef NAV_EXPLORE_H_
 #define NAV_EXPLORE_H_
 
-#include <traceback_msgs/GoalAndImage.h>
-#include <traceback_msgs/ImageAndImage.h>
-
 #include <actionlib/client/simple_action_client.h>
 #include <explore/costmap_client.h>
 #include <explore/frontier_search.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <move_base_msgs/MoveBaseAction.h>
 #include <ros/ros.h>
+#include <traceback_msgs/GoalAndImage.h>
+#include <traceback_msgs/ImageAndImage.h>
 #include <visualization_msgs/MarkerArray.h>
 
 #include <memory>
@@ -93,7 +92,10 @@ private:
     return ros::this_node::getNamespace();
   }
 
-  void tracebackGoalAndImageUpdate(const traceback_msgs::GoalAndImage::ConstPtr& msg);
+  void tracebackGoalAndImageUpdate(
+      const traceback_msgs::GoalAndImage::ConstPtr& msg);
+
+  void CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg);
 
   ros::NodeHandle private_nh_;
   ros::NodeHandle relative_nh_;
@@ -113,13 +115,17 @@ private:
   ros::Time last_progress_;
   size_t last_markers_count_;
 
+  ros::Subscriber robot_camera_image_subscriber_;
+  std::string robot_camera_image_topic_ = "camera/rgb/image_raw";
+  sensor_msgs::Image current_image_;
+
   ros::Subscriber traceback_goal_and_image_subscriber_;
   std::string traceback_goal_and_image_topic_ = "traceback/goal_and_image";
   ros::Publisher traceback_image_and_image_publisher_;
   std::string traceback_image_and_image_topic_ = "traceback/image_and_image";
   bool in_traceback_ = false;
   move_base_msgs::MoveBaseGoal current_traceback_goal_;
-  sensor_msgs::Image current_image_;
+  sensor_msgs::Image current_traced_robot_image_;
 
   // parameters
   double planner_frequency_;

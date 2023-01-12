@@ -109,6 +109,12 @@ Explore::Explore()
       private_nh_.advertise<traceback_msgs::ImageAndImage>(
           ros::names::append(getRobotName(), traceback_image_and_image_topic_),
           10);
+
+  robot_camera_image_subscriber_ = private_nh_.subscribe<sensor_msgs::Image>(
+      ros::names::append(getRobotName(), robot_camera_image_topic_), 50,
+      [this](const sensor_msgs::ImageConstPtr& msg) {
+        CameraImageUpdate(msg);
+      });
 }
 
 Explore::~Explore()
@@ -435,8 +441,13 @@ void Explore::tracebackGoalAndImageUpdate(
   if (!in_traceback_) {
     in_traceback_ = true;
     current_traceback_goal_ = msg->goal;
-    current_image_ = msg->image;
+    current_traced_robot_image_ = msg->image;
   }
+}
+
+void Explore::CameraImageUpdate(const sensor_msgs::ImageConstPtr& msg)
+{
+  current_image_ = *msg;
 }
 
 void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
@@ -450,13 +461,14 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
   }
 
   if (in_traceback_) {
-    in_traceback_ = false;
     ROS_INFO("Reached goal with status: %s", status.toString().c_str());
     traceback_msgs::ImageAndImage images;
-    images.traced_image = current_image_;
+    images.traced_image = current_traced_robot_image_;
     // TODO also capture current image and send
     images.tracer_image = current_image_;
     traceback_image_and_image_publisher_.publish(images);
+    
+    in_traceback_ = false;
   }
 
   // find new goal immediatelly regardless of planning frequency.
