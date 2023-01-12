@@ -423,6 +423,8 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
           images.traced_image = current_traced_robot_image_;
           // TODO also capture current image and send
           images.tracer_image = current_image_;
+          images.robot_name = getRobotName();
+          images.stamp = current_image_.header.stamp.toNSec();
           traceback_image_and_image_publisher_.publish(images);
           makePlan();
         },
