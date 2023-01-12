@@ -126,6 +126,7 @@ private:
   bool in_traceback_ = false;
   move_base_msgs::MoveBaseGoal current_traceback_goal_;
   sensor_msgs::Image current_traced_robot_image_;
+  int64_t current_traced_robot_stamp_;
 
   // parameters
   double planner_frequency_;
