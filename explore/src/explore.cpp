@@ -445,6 +445,7 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
             images.traced_robot = current_traced_robot_;
             images.stamp = current_traced_robot_stamp_;
             traceback_image_and_image_publisher_.publish(images);
+            makePlan();
           },
           true);
     }
