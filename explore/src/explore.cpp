@@ -343,8 +343,25 @@ void Explore::makePlan()
     ROS_DEBUG("Adding current goal to black list");
     if (in_traceback_) {
       in_traceback_ = false;
+
+      ROS_INFO("Traceback location blacklisted");
+
+      oneshot_ = relative_nh_.createTimer(
+          ros::Duration(1, 0),
+          [this](const ros::TimerEvent&) {
+            traceback_msgs::ImageAndImage images;
+            images.aborted = true;
+            images.traced_image = current_traced_robot_image_;
+            // TODO also capture current image and send
+            images.tracer_image = current_image_;
+            images.tracer_robot = current_tracer_robot_;
+            images.traced_robot = current_traced_robot_;
+            images.stamp = current_traced_robot_stamp_;
+            traceback_image_and_image_publisher_.publish(images);
+            makePlan();
+          },
+          true);
     }
-    makePlan();
     return;
   }
 
@@ -392,6 +409,7 @@ void Explore::tracebackGoalAndImageUpdate(
     in_traceback_ = true;
     current_traceback_goal_ = msg->goal;
     current_traced_robot_image_ = msg->image;
+    current_tracer_robot_ = msg->tracer_robot;
     current_traced_robot_ = msg->traced_robot;
     current_traced_robot_stamp_ = msg->stamp;
   }
@@ -412,20 +430,39 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
     ROS_DEBUG("Adding current goal to black list");
     if (in_traceback_) {
       in_traceback_ = false;
+
+      ROS_INFO("Traceback aborted");
+
+      oneshot_ = relative_nh_.createTimer(
+          ros::Duration(1, 0),
+          [this](const ros::TimerEvent&) {
+            traceback_msgs::ImageAndImage images;
+            images.aborted = true;
+            images.traced_image = current_traced_robot_image_;
+            // TODO also capture current image and send
+            images.tracer_image = current_image_;
+            images.tracer_robot = current_tracer_robot_;
+            images.traced_robot = current_traced_robot_;
+            images.stamp = current_traced_robot_stamp_;
+            traceback_image_and_image_publisher_.publish(images);
+          },
+          true);
     }
   } else if (in_traceback_) {
     in_traceback_ = false;
 
-    ROS_INFO("Reached goal with status: %s", status.toString().c_str());
+    ROS_INFO("Traceback reached");
 
     oneshot_ = relative_nh_.createTimer(
         ros::Duration(1, 0),
         [this](const ros::TimerEvent&) {
           traceback_msgs::ImageAndImage images;
+          images.aborted = false;
           images.traced_image = current_traced_robot_image_;
           // TODO also capture current image and send
           images.tracer_image = current_image_;
-          images.robot_name = current_traced_robot_;
+          images.tracer_robot = current_tracer_robot_;
+          images.traced_robot = current_traced_robot_;
           images.stamp = current_traced_robot_stamp_;
           traceback_image_and_image_publisher_.publish(images);
           makePlan();
