@@ -84,6 +84,10 @@ private:
                    const move_base_msgs::MoveBaseResultConstPtr& result,
                    const geometry_msgs::Point& frontier_goal);
 
+  void reachedTracebackGoal(const actionlib::SimpleClientGoalState& status,
+                            const move_base_msgs::MoveBaseResultConstPtr& result,
+                            const move_base_msgs::MoveBaseGoal& traceback_goal);
+
   bool goalOnBlacklist(const geometry_msgs::Point& goal);
 
   // e.g. return "/tb3_0"
@@ -92,10 +96,16 @@ private:
     return ros::this_node::getNamespace();
   }
 
+  ros::Timer traceback_timeout_timer_;
+  ros::Timer traceback_oneshot_;
+  void doTraceback(move_base_msgs::MoveBaseGoal goal);
+
+  void sendResultToTraceback(bool aborted);
+
   void tracebackGoalAndImageUpdate(
       const traceback_msgs::GoalAndImage::ConstPtr& msg);
 
-  void CameraImageUpdate(const sensor_msgs::ImageConstPtr &msg);
+  void CameraImageUpdate(const sensor_msgs::ImageConstPtr& msg);
 
   ros::NodeHandle private_nh_;
   ros::NodeHandle relative_nh_;
@@ -123,7 +133,12 @@ private:
   std::string traceback_goal_and_image_topic_ = "traceback/goal_and_image";
   ros::Publisher traceback_image_and_image_publisher_;
   std::string traceback_image_and_image_topic_ = "traceback/image_and_image";
+
   bool in_traceback_ = false;
+  ros::Timer resume_timer_;
+  void resumeNormalExplorationLater(int32_t second);
+  void cancelResumeNormalExplorationLater();
+
   move_base_msgs::MoveBaseGoal current_traceback_goal_;
   sensor_msgs::Image current_traced_robot_image_;
   std::string current_tracer_robot_;

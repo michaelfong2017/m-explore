@@ -212,6 +212,10 @@ void Explore::makePlan()
   ROS_DEBUG("\n\nmakePlan\n%d\n", ros::Time::now().sec);
   // return;
 
+  if (in_traceback_) {
+    return;
+  }
+
   // find frontiers
   auto pose = costmap_client_.getRobotPose();
 
@@ -233,39 +237,6 @@ void Explore::makePlan()
     ROS_DEBUG("frontier %zd cost: %f", i, frontiers[i].cost);
   }
 
-  if (frontiers.empty()) {
-    // stop();
-    // return;
-
-    // In order to test in bigger maps, instead of stopping exploration,
-    // command the robot to randomly move in a direction.
-    frontier_exploration::Frontier frontier;
-    geometry_msgs::Point random_point;
-    int r = rand() % 4;
-    switch (r) {
-      case 0:
-        random_point.x = 5.0;
-        random_point.y = 0.0;
-        break;
-      case 1:
-        random_point.x = -5.0;
-        random_point.y = 0.0;
-        break;
-      case 2:
-        random_point.x = 0.0;
-        random_point.y = 5.0;
-        break;
-      case 3:
-        random_point.x = 0.0;
-        random_point.y = -5.0;
-        break;
-    }
-    random_point.z = 0.0;
-    frontier.centroid = random_point;
-    frontier.min_distance = 5.0;
-    frontiers.emplace_back(frontier);
-  }
-
   // publish frontiers as visualization markers
   if (visualize_) {
     visualizeFrontiers(frontiers);
@@ -283,26 +254,13 @@ void Explore::makePlan()
   target_orientation.y = 0.0;
   target_orientation.z = 0.0;
   target_orientation.w = 1.0;
-  // TODO use topic from Traceback to get frontier->centroid
-  // If the queue is empty, override nothing, if there exists goal, override
-  // frontier min_distance should be the distance between robot and goal.
-  // min_distance should be calculated every pass to see whether there is
-  // progress
-  // TODO need to override frontier->centroid and frontier->min_distance
-  bool traceback_goal_in_blacklist = false;
-  if (in_traceback_) {
-    frontier->centroid = current_traceback_goal_.target_pose.pose.position;
-    frontier->min_distance = sqrt(
-        pow((double(pose.position.x) - double(frontier->centroid.x)), 2.0) +
-        pow((double(pose.position.y) - double(frontier->centroid.y)), 2.0));
-    target_orientation = current_traceback_goal_.target_pose.pose.orientation;
-    if (goalOnBlacklist(frontier->centroid)) {
-      ROS_DEBUG("traceback goal is on blacklist");
-      traceback_goal_in_blacklist = true;
-    }
-  }
 
-  if (frontier == frontiers.end() || traceback_goal_in_blacklist) {
+  geometry_msgs::Point target_position;
+  double min_distance;
+  if (frontier != frontiers.end()) {
+    target_position = frontier->centroid;
+    min_distance = frontier->min_distance;
+  } else {
     // stop();
     // return;
 
@@ -312,62 +270,39 @@ void Explore::makePlan()
     int r = rand() % 4;
     switch (r) {
       case 0:
-        random_point.x = 5.0;
-        random_point.y = 0.0;
+        random_point.x = pose.position.x + 5.0;
+        random_point.y = pose.position.y + 0.0;
         break;
       case 1:
-        random_point.x = -5.0;
-        random_point.y = 0.0;
+        random_point.x = pose.position.x + -5.0;
+        random_point.y = pose.position.y + 0.0;
         break;
       case 2:
-        random_point.x = 0.0;
-        random_point.y = 5.0;
+        random_point.x = pose.position.x + 0.0;
+        random_point.y = pose.position.y + 5.0;
         break;
       case 3:
-        random_point.x = 0.0;
-        random_point.y = -5.0;
+        random_point.x = pose.position.x + 0.0;
+        random_point.y = pose.position.x + -5.0;
         break;
     }
     random_point.z = 0.0;
-    frontier->centroid = random_point;
-    frontier->min_distance = 5.0;
+    target_position = random_point;
+    min_distance = 5.0;
   }
-
-  geometry_msgs::Point target_position = frontier->centroid;
 
   // time out if we are not making any progress
   bool same_goal = prev_goal_ == target_position;
   prev_goal_ = target_position;
-  if (!same_goal || prev_distance_ > frontier->min_distance) {
+  if (!same_goal || prev_distance_ > min_distance) {
     // we have different goal or we made some progress
     last_progress_ = ros::Time::now();
-    prev_distance_ = frontier->min_distance;
+    prev_distance_ = min_distance;
   }
   // black list if we've made no progress for a long time
   if (ros::Time::now() - last_progress_ > progress_timeout_) {
     frontier_blacklist_.push_back(target_position);
     ROS_DEBUG("Adding current goal to black list");
-    if (in_traceback_) {
-      in_traceback_ = false;
-
-      ROS_INFO("Traceback location blacklisted");
-
-      oneshot_ = relative_nh_.createTimer(
-          ros::Duration(1, 0),
-          [this](const ros::TimerEvent&) {
-            traceback_msgs::ImageAndImage images;
-            images.aborted = true;
-            images.traced_image = current_traced_robot_image_;
-            // TODO also capture current image and send
-            images.tracer_image = current_image_;
-            images.tracer_robot = current_tracer_robot_;
-            images.traced_robot = current_traced_robot_;
-            images.stamp = current_traced_robot_stamp_;
-            traceback_image_and_image_publisher_.publish(images);
-            makePlan();
-          },
-          true);
-    }
     return;
   }
 
@@ -407,23 +342,90 @@ bool Explore::goalOnBlacklist(const geometry_msgs::Point& goal)
   return false;
 }
 
+void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal)
+{
+  ROS_DEBUG("\n\ndoTraceback\n%d\n", ros::Time::now().sec);
+
+  geometry_msgs::Point target_position = goal.target_pose.pose.position;
+
+  if (goalOnBlacklist(target_position)) {
+    ROS_DEBUG("traceback goal is on blacklist");
+    move_base_client_.cancelGoal();
+    // Then, process in the callback function
+  }
+
+  // auto pose = costmap_client_.getRobotPose();
+
+  // double min_distance =
+  //     sqrt(pow((double(pose.position.x) - double(target_position.x)), 2.0) +
+  //          pow((double(pose.position.y) - double(target_position.y)), 2.0));
+
+  // Cancel the goal after 30 seconds, which is the timeou
+  // Also blacklist the goal
+  traceback_timeout_timer_ = relative_nh_.createTimer(
+      ros::Duration(30, 0),
+      [this, target_position](const ros::TimerEvent&) {
+        ROS_DEBUG("Cancelling traceback goal after 30 seconds");
+        move_base_client_.cancelGoal();
+        // Then, process in the callback function
+      },
+      true);
+
+  // send goal to move_base if we have something new to pursue
+  move_base_client_.sendGoal(
+      goal, [this, goal](const actionlib::SimpleClientGoalState& status,
+                         const move_base_msgs::MoveBaseResultConstPtr& result) {
+        reachedTracebackGoal(status, result, goal);
+      });
+}
+
+void Explore::sendResultToTraceback(bool aborted)
+{
+  traceback_msgs::ImageAndImage images;
+  images.aborted = aborted;
+  images.traced_image = current_traced_robot_image_;
+  images.tracer_image = current_image_;
+  images.tracer_robot = current_tracer_robot_;
+  images.traced_robot = current_traced_robot_;
+  images.stamp = current_traced_robot_stamp_;
+  traceback_image_and_image_publisher_.publish(images);
+}
+
 void Explore::tracebackGoalAndImageUpdate(
     const traceback_msgs::GoalAndImage::ConstPtr& msg)
 {
   ROS_INFO("tracebackGoalAndImageUpdate");
+  cancelResumeNormalExplorationLater();
+
+  // TODO currently, in_traceback_ is set back to false only 30 seconds after sendGoal callback received
   if (!in_traceback_) {
     in_traceback_ = true;
-    current_traceback_goal_ = msg->goal;
-    current_traced_robot_image_ = msg->image;
-    current_tracer_robot_ = msg->tracer_robot;
-    current_traced_robot_ = msg->traced_robot;
-    current_traced_robot_stamp_ = msg->stamp;
   }
+
+  current_traceback_goal_ = msg->goal;
+  current_traced_robot_image_ = msg->image;
+  current_tracer_robot_ = msg->tracer_robot;
+  current_traced_robot_ = msg->traced_robot;
+  current_traced_robot_stamp_ = msg->stamp;
+
+  doTraceback(current_traceback_goal_);
 }
 
 void Explore::CameraImageUpdate(const sensor_msgs::ImageConstPtr& msg)
 {
   current_image_ = *msg;
+}
+
+void Explore::resumeNormalExplorationLater(int32_t second)
+{
+  resume_timer_ = relative_nh_.createTimer(
+      ros::Duration(second, 0),
+      [this](const ros::TimerEvent&) { in_traceback_ = false; }, true);
+}
+
+void Explore::cancelResumeNormalExplorationLater()
+{
+  resume_timer_.stop();
 }
 
 void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
@@ -434,56 +436,53 @@ void Explore::reachedGoal(const actionlib::SimpleClientGoalState& status,
   if (status == actionlib::SimpleClientGoalState::ABORTED) {
     frontier_blacklist_.push_back(frontier_goal);
     ROS_DEBUG("Adding current goal to black list");
-    if (in_traceback_) {
-      in_traceback_ = false;
-
-      ROS_INFO("Traceback aborted");
-
-      oneshot_ = relative_nh_.createTimer(
-          ros::Duration(1, 0),
-          [this](const ros::TimerEvent&) {
-            traceback_msgs::ImageAndImage images;
-            images.aborted = true;
-            images.traced_image = current_traced_robot_image_;
-            // TODO also capture current image and send
-            images.tracer_image = current_image_;
-            images.tracer_robot = current_tracer_robot_;
-            images.traced_robot = current_traced_robot_;
-            images.stamp = current_traced_robot_stamp_;
-            traceback_image_and_image_publisher_.publish(images);
-            makePlan();
-          },
-          true);
-    }
-  } else if (in_traceback_) {
-    in_traceback_ = false;
-
-    ROS_INFO("Traceback reached");
-
-    oneshot_ = relative_nh_.createTimer(
-        ros::Duration(1, 0),
-        [this](const ros::TimerEvent&) {
-          traceback_msgs::ImageAndImage images;
-          images.aborted = false;
-          images.traced_image = current_traced_robot_image_;
-          // TODO also capture current image and send
-          images.tracer_image = current_image_;
-          images.tracer_robot = current_tracer_robot_;
-          images.traced_robot = current_traced_robot_;
-          images.stamp = current_traced_robot_stamp_;
-          traceback_image_and_image_publisher_.publish(images);
-          makePlan();
-        },
-        true);
-  } else {
-    // find new goal immediatelly regardless of planning frequency.
-    // execute via timer to prevent dead lock in move_base_client (this is
-    // callback for sendGoal, which is called in makePlan). the timer must live
-    // until callback is executed.
-    oneshot_ = relative_nh_.createTimer(
-        ros::Duration(0, 0), [this](const ros::TimerEvent&) { makePlan(); },
-        true);
   }
+
+  // find new goal immediatelly regardless of planning frequency.
+  // execute via timer to prevent dead lock in move_base_client (this is
+  // callback for sendGoal, which is called in makePlan). the timer must live
+  // until callback is executed.
+  oneshot_ = relative_nh_.createTimer(
+      ros::Duration(0, 0), [this](const ros::TimerEvent&) { makePlan(); },
+      true);
+}
+
+// Terminal States
+// Rejected - The goal was rejected by the action server without being processed
+// and without a request from the action client to cancel Succeeded - The goal
+// was achieved successfully by the action server Aborted - The goal was
+// terminated by the action server without an external request from the action
+// client to cancel Recalled - The goal was canceled by either another goal, or
+// a cancel request, before the action server began processing the goal
+// Preempted - Processing of the goal was canceled by either another goal, or a
+// cancel request sent to the action server
+void Explore::reachedTracebackGoal(
+    const actionlib::SimpleClientGoalState& status,
+    const move_base_msgs::MoveBaseResultConstPtr& result,
+    const move_base_msgs::MoveBaseGoal& traceback_goal)
+{
+  ROS_DEBUG("Traceback reached goal with status: %s",
+            status.toString().c_str());
+  if (status == actionlib::SimpleClientGoalState::SUCCEEDED) {
+    // Wait 1 second in order to collect a correct image at the goal
+    traceback_oneshot_ = relative_nh_.createTimer(
+        ros::Duration(1, 0),
+        [this](const ros::TimerEvent&) { sendResultToTraceback(false); }, true);
+  }
+
+  else {
+    // May cause duplication
+    frontier_blacklist_.push_back(traceback_goal.target_pose.pose.position);
+    ROS_DEBUG("Adding current traceback goal to black list");
+    // Wait 1 second in order to collect a correct image at the goal
+    traceback_oneshot_ = relative_nh_.createTimer(
+        ros::Duration(1, 0),
+        [this](const ros::TimerEvent&) { sendResultToTraceback(true); }, true);
+  }
+
+  // Wait for some time for Traceback to process,
+  // If no message is sent after 30 seconds, resume to normal exploration
+  resumeNormalExplorationLater(30);
 }
 
 void Explore::start()
