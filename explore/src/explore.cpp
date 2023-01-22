@@ -278,6 +278,11 @@ void Explore::makePlan()
                          return goalOnBlacklist(f.centroid);
                        });
 
+  geometry_msgs::Quaternion target_orientation;
+  target_orientation.x = 0.0;
+  target_orientation.y = 0.0;
+  target_orientation.z = 0.0;
+  target_orientation.w = 1.0;
   // TODO use topic from Traceback to get frontier->centroid
   // If the queue is empty, override nothing, if there exists goal, override
   // frontier min_distance should be the distance between robot and goal.
@@ -290,6 +295,7 @@ void Explore::makePlan()
     frontier->min_distance = sqrt(
         pow((double(pose.position.x) - double(frontier->centroid.x)), 2.0) +
         pow((double(pose.position.y) - double(frontier->centroid.y)), 2.0));
+    target_orientation = current_traceback_goal_.target_pose.pose.orientation;
     if (goalOnBlacklist(frontier->centroid)) {
       ROS_DEBUG("traceback goal is on blacklist");
       traceback_goal_in_blacklist = true;
@@ -373,7 +379,7 @@ void Explore::makePlan()
   // send goal to move_base if we have something new to pursue
   move_base_msgs::MoveBaseGoal goal;
   goal.target_pose.pose.position = target_position;
-  goal.target_pose.pose.orientation.w = 1.;
+  goal.target_pose.pose.orientation = target_orientation;
   goal.target_pose.header.frame_id = costmap_client_.getGlobalFrameID();
   goal.target_pose.header.stamp = ros::Time::now();
   move_base_client_.sendGoal(
