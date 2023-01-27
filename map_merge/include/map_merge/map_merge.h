@@ -38,17 +38,19 @@
 #ifndef MAP_MERGE_H_
 #define MAP_MERGE_H_
 
-#include <atomic>
-#include <forward_list>
-#include <mutex>
-#include <unordered_map>
+#include <traceback_msgs/TracebackTransforms.h>
 
 #include <combine_grids/merging_pipeline.h>
 #include <geometry_msgs/Pose.h>
 #include <map_msgs/OccupancyGridUpdate.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <ros/ros.h>
+
+#include <atomic>
 #include <boost/thread.hpp>
+#include <forward_list>
+#include <mutex>
+#include <unordered_map>
 
 namespace map_merge
 {
@@ -63,6 +65,8 @@ struct MapSubscription {
 
   ros::Subscriber map_sub;
   ros::Subscriber map_updates_sub;
+
+  std::string robot_namespace;  // e.g /tb3_0
 };
 
 class MapMerge
@@ -91,6 +95,12 @@ private:
   boost::shared_mutex subscriptions_mutex_;
   combine_grids::MergingPipeline pipeline_;
   std::mutex pipeline_mutex_;
+
+  bool have_traceback_transforms_ = false;
+  ros::Subscriber traceback_transforms_subscriber_;
+  std::string traceback_transforms_topic_ = "/traceback/traceback_transforms";
+  std::vector<geometry_msgs::Transform> current_traceback_transforms_;
+  void tracebackTransformsUpdate(const traceback_msgs::TracebackTransforms::ConstPtr& msg);
 
   std::string robotNameFromTopic(const std::string& topic);
   bool isRobotMapTopic(const ros::master::TopicInfo& topic);

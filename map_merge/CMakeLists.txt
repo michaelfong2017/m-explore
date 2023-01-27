@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   roscpp
   tf2_geometry_msgs
+  traceback_msgs
 )
 
 find_package(Boost REQUIRED COMPONENTS thread)

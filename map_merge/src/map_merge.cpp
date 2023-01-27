@@ -35,12 +35,12 @@
  *
  *********************************************************************/
 
-#include <thread>
-
 #include <map_merge/map_merge.h>
 #include <ros/assert.h>
 #include <ros/console.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
+#include <thread>
 
 namespace map_merge
 {
@@ -65,6 +65,13 @@ MapMerge::MapMerge() : subscriptions_size_(0)
   /* publishing */
   merged_map_publisher_ =
       node_.advertise<nav_msgs::OccupancyGrid>(merged_map_topic, 50, true);
+
+  traceback_transforms_subscriber_ =
+      node_.subscribe<traceback_msgs::TracebackTransforms>(
+          traceback_transforms_topic_, 10,
+          [this](const traceback_msgs::TracebackTransforms::ConstPtr& msg) {
+            tracebackTransformsUpdate(msg);
+          });
 }
 
 /*
@@ -137,6 +144,8 @@ void MapMerge::topicSubscribing()
                 const map_msgs::OccupancyGridUpdate::ConstPtr& msg) {
               partialMapUpdate(msg, subscription);
             });
+
+    subscription.robot_namespace = robot_name;
   }
 }
 
@@ -147,7 +156,24 @@ void MapMerge::mapMerging()
 {
   ROS_DEBUG("Map merging started.");
 
-  if (have_initial_poses_) {
+  if (have_traceback_transforms_) {
+    std::vector<nav_msgs::OccupancyGridConstPtr> grids;
+    grids.reserve(subscriptions_size_);
+    {
+      boost::shared_lock<boost::shared_mutex> lock(subscriptions_mutex_);
+      for (auto& subscription : subscriptions_) {
+        std::lock_guard<std::mutex> s_lock(subscription.mutex);
+        grids.push_back(subscription.readonly_map);
+      }
+    }
+    // we don't need to lock here, because when have_initial_poses_ is true we
+    // will not run concurrently on the pipeline
+    pipeline_.feed(grids.begin(), grids.end());
+
+    // Get transforms from traceback and set transform in pipeline
+    pipeline_.setTransforms(current_traceback_transforms_.begin(), current_traceback_transforms_.end());
+
+  } else if (have_initial_poses_) {
     std::vector<nav_msgs::OccupancyGridConstPtr> grids;
     std::vector<geometry_msgs::Transform> transforms;
     grids.reserve(subscriptions_size_);
@@ -186,6 +212,10 @@ void MapMerge::mapMerging()
 
 void MapMerge::poseEstimation()
 {
+  if (have_traceback_transforms_) {
+    return;
+  }
+
   ROS_DEBUG("Grid pose estimation started.");
   std::vector<nav_msgs::OccupancyGridConstPtr> grids;
   grids.reserve(subscriptions_size_);
@@ -292,6 +322,31 @@ void MapMerge::partialMapUpdate(
   }
 }
 
+void MapMerge::tracebackTransformsUpdate(
+    const traceback_msgs::TracebackTransforms::ConstPtr& msg)
+{
+  ROS_DEBUG("received traceback transforms update");
+  current_traceback_transforms_.clear();
+  {
+    boost::shared_lock<boost::shared_mutex> lock(subscriptions_mutex_);
+    for (auto& subscription : subscriptions_) {
+      std::lock_guard<std::mutex> s_lock(subscription.mutex);
+      std::string robot_name = subscription.robot_namespace;
+      size_t index = -1;
+      auto it = std::find(msg->robot_names.begin(), msg->robot_names.end(),
+                          robot_name);
+      if (it != msg->robot_names.end()) {
+        index = it - msg->robot_names.begin();
+      } else {
+        ROS_ERROR("Traceback transform of %s is not found!",
+                  robot_name.c_str());
+      }
+      current_traceback_transforms_.push_back(msg->transforms[index]);
+    }
+  }
+  have_traceback_transforms_ = true;
+}
+
 std::string MapMerge::robotNameFromTopic(const std::string& topic)
 {
   return ros::names::parentNamespace(topic);
@@ -328,15 +383,22 @@ bool MapMerge::getInitPose(const std::string& name,
   std::string merging_namespace = ros::names::append(name, "map_merge");
   double yaw = 0.0;
 
-  bool success =
-      ros::param::get(ros::names::append(merging_namespace, "init_pose_x"),
-                      pose.translation.x) &&
-      ros::param::get(ros::names::append(merging_namespace, "init_pose_y"),
-                      pose.translation.y) &&
-      ros::param::get(ros::names::append(merging_namespace, "init_pose_z"),
-                      pose.translation.z) &&
-      ros::param::get(ros::names::append(merging_namespace, "init_pose_yaw"),
-                      yaw);
+  bool success = ros::param::get(ros::names::append(merging_namespace, "init_"
+                                                                       "pose_"
+                                                                       "x"),
+                                 pose.translation.x) &&
+                 ros::param::get(ros::names::append(merging_namespace, "init_"
+                                                                       "pose_"
+                                                                       "y"),
+                                 pose.translation.y) &&
+                 ros::param::get(ros::names::append(merging_namespace, "init_"
+                                                                       "pose_"
+                                                                       "z"),
+                                 pose.translation.z) &&
+                 ros::param::get(ros::names::append(merging_namespace, "init_"
+                                                                       "pose_"
+                                                                       "yaw"),
+                                 yaw);
 
   tf2::Quaternion q;
   q.setEuler(0., 0., yaw);
