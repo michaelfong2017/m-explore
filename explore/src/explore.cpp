@@ -480,9 +480,9 @@ void Explore::reachedTracebackGoal(
         [this](const ros::TimerEvent&) { sendResultToTraceback(true); }, true);
   }
 
-  // Wait for some time for Traceback to process,
-  // If no message is sent after 30 seconds, resume to normal exploration
-  resumeNormalExplorationLater(30);
+  // Wait for some time for Traceback to process (continue traceback),
+  // If no message is sent after 3 seconds, resume to normal exploration
+  resumeNormalExplorationLater(3);
 }
 
 void Explore::start()
