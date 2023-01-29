@@ -387,6 +387,7 @@ void Explore::sendResultToTraceback(bool aborted)
   images.tracer_image = current_image_;
   images.tracer_robot = current_tracer_robot_;
   images.traced_robot = current_traced_robot_;
+  images.goal = current_traceback_goal_;
   images.stamp = current_traced_robot_stamp_;
   traceback_image_and_image_publisher_.publish(images);
 }
