@@ -387,6 +387,8 @@ void Explore::sendResultToTraceback(bool aborted)
   images.tracer_image = current_image_;
   images.tracer_robot = current_tracer_robot_;
   images.traced_robot = current_traced_robot_;
+  images.dst_map_origin_x = current_dst_map_origin_x_;
+  images.dst_map_origin_y = current_dst_map_origin_y_;
   images.goal = current_traceback_goal_;
   images.stamp = current_traced_robot_stamp_;
   traceback_image_and_image_publisher_.publish(images);
@@ -407,6 +409,8 @@ void Explore::tracebackGoalAndImageUpdate(
   current_traced_robot_image_ = msg->image;
   current_tracer_robot_ = msg->tracer_robot;
   current_traced_robot_ = msg->traced_robot;
+  current_dst_map_origin_x_ = msg->dst_map_origin_x;
+  current_dst_map_origin_y_ = msg->dst_map_origin_y;
   current_traced_robot_stamp_ = msg->stamp;
 
   doTraceback(current_traceback_goal_);

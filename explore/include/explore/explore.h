@@ -143,6 +143,8 @@ private:
   sensor_msgs::Image current_traced_robot_image_;
   std::string current_tracer_robot_;
   std::string current_traced_robot_;
+  double current_dst_map_origin_x_;
+  double current_dst_map_origin_y_;
   int64_t current_traced_robot_stamp_;
 
   // parameters
