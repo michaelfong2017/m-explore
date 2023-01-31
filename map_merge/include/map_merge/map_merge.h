@@ -99,7 +99,8 @@ private:
   bool have_traceback_transforms_ = false;
   ros::Subscriber traceback_transforms_subscriber_;
   std::string traceback_transforms_topic_ = "/traceback/traceback_transforms";
-  std::vector<geometry_msgs::Transform> current_traceback_transforms_;
+  std::vector<cv::Mat> current_traceback_transforms_;
+  std::vector<cv::Mat> modified_traceback_transforms_;
   void tracebackTransformsUpdate(const traceback_msgs::TracebackTransforms::ConstPtr& msg);
 
   std::string robotNameFromTopic(const std::string& topic);

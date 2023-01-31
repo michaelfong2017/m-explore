@@ -158,33 +158,59 @@ void MapMerge::mapMerging()
 
   if (have_traceback_transforms_) {
     std::vector<nav_msgs::OccupancyGridConstPtr> grids;
+    std::vector<cv::Point2d> map_origins;
+    std::vector<float> resolutions;
     grids.reserve(subscriptions_size_);
+    map_origins.reserve(subscriptions_size_);
+    resolutions.reserve(subscriptions_size_);
     {
       boost::shared_lock<boost::shared_mutex> lock(subscriptions_mutex_);
       for (auto& subscription : subscriptions_) {
         std::lock_guard<std::mutex> s_lock(subscription.mutex);
         grids.push_back(subscription.readonly_map);
+        map_origins.emplace_back(
+            cv::Point2d(subscription.readonly_map->info.origin.position.x,
+                        subscription.readonly_map->info.origin.position.y));
+        resolutions.push_back(subscription.readonly_map->info.resolution);
       }
     }
+
+    pipeline_.modifyTransformsBasedOnOrigins(current_traceback_transforms_,
+                                             modified_traceback_transforms_,
+                                             map_origins, resolutions);
+
     // we don't need to lock here, because when have_initial_poses_ is true we
     // will not run concurrently on the pipeline
     pipeline_.feed(grids.begin(), grids.end());
 
     // Get transforms from traceback and set transform in pipeline
-    pipeline_.setTransforms(current_traceback_transforms_.begin(), current_traceback_transforms_.end());
+    pipeline_.setCvTransforms(modified_traceback_transforms_);
 
   } else if (have_initial_poses_) {
     std::vector<nav_msgs::OccupancyGridConstPtr> grids;
     std::vector<geometry_msgs::Transform> transforms;
+    std::vector<cv::Point2d> map_origins;
+    std::vector<float> resolutions;
     grids.reserve(subscriptions_size_);
+    map_origins.reserve(subscriptions_size_);
+    resolutions.reserve(subscriptions_size_);
     {
       boost::shared_lock<boost::shared_mutex> lock(subscriptions_mutex_);
       for (auto& subscription : subscriptions_) {
         std::lock_guard<std::mutex> s_lock(subscription.mutex);
         grids.push_back(subscription.readonly_map);
         transforms.push_back(subscription.initial_pose);
+        map_origins.push_back(
+            cv::Point2d(subscription.readonly_map->info.origin.position.x,
+                        subscription.readonly_map->info.origin.position.y));
+        resolutions.push_back(subscription.readonly_map->info.resolution);
       }
     }
+
+    // TODO
+    // pipeline_.modifyTransformsBasedOnOrigins(transforms, map_origins,
+    //                                          resolutions);
+
     // we don't need to lock here, because when have_initial_poses_ is true we
     // will not run concurrently on the pipeline
     pipeline_.feed(grids.begin(), grids.end());
@@ -326,6 +352,17 @@ void MapMerge::tracebackTransformsUpdate(
     const traceback_msgs::TracebackTransforms::ConstPtr& msg)
 {
   ROS_DEBUG("received traceback transforms update");
+
+  std::vector<double> m_00 = msg->m_00;
+  std::vector<double> m_01 = msg->m_01;
+  std::vector<double> m_02 = msg->m_02;
+  std::vector<double> m_10 = msg->m_10;
+  std::vector<double> m_11 = msg->m_11;
+  std::vector<double> m_12 = msg->m_12;
+  std::vector<double> m_20 = msg->m_20;
+  std::vector<double> m_21 = msg->m_21;
+  std::vector<double> m_22 = msg->m_22;
+
   current_traceback_transforms_.clear();
   {
     boost::shared_lock<boost::shared_mutex> lock(subscriptions_mutex_);
@@ -341,9 +378,20 @@ void MapMerge::tracebackTransformsUpdate(
         ROS_ERROR("Traceback transform of %s is not found!",
                   robot_name.c_str());
       }
-      current_traceback_transforms_.push_back(msg->transforms[index]);
+      cv::Mat mat(3, 3, CV_64F);
+      mat.at<double>(0, 0) = m_00[index];
+      mat.at<double>(0, 1) = m_01[index];
+      mat.at<double>(0, 2) = m_02[index];
+      mat.at<double>(1, 0) = m_10[index];
+      mat.at<double>(1, 1) = m_11[index];
+      mat.at<double>(1, 2) = m_12[index];
+      mat.at<double>(2, 0) = m_20[index];
+      mat.at<double>(2, 1) = m_21[index];
+      mat.at<double>(2, 2) = m_22[index];
+      current_traceback_transforms_.push_back(mat);
     }
   }
+
   have_traceback_transforms_ = true;
 }
 

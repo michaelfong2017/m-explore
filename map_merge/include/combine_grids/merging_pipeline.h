@@ -37,12 +37,11 @@
 #ifndef MERGING_PIPELINE_H_
 #define MERGING_PIPELINE_H_
 
-#include <vector>
-
 #include <geometry_msgs/Transform.h>
 #include <nav_msgs/OccupancyGrid.h>
 
 #include <opencv2/core/utility.hpp>
+#include <vector>
 
 namespace combine_grids
 {
@@ -57,6 +56,12 @@ class MergingPipeline
 public:
   template <typename InputIt>
   void feed(InputIt grids_begin, InputIt grids_end);
+
+  void modifyTransformsBasedOnOrigins(std::vector<cv::Mat> transforms,
+                                      std::vector<cv::Mat> &out,
+                                      std::vector<cv::Point2d> map_origins,
+                                      std::vector<float> resolutions);
+
   bool estimateTransforms(FeatureType feature = FeatureType::AKAZE,
                           double confidence = 1.0);
   nav_msgs::OccupancyGrid::Ptr composeGrids();
@@ -64,6 +69,8 @@ public:
   std::vector<geometry_msgs::Transform> getTransforms() const;
   template <typename InputIt>
   bool setTransforms(InputIt transforms_begin, InputIt transforms_end);
+
+  void setCvTransforms(std::vector<cv::Mat> transforms);
 
 private:
   std::vector<nav_msgs::OccupancyGrid::ConstPtr> grids_;
@@ -74,7 +81,7 @@ private:
 template <typename InputIt>
 void MergingPipeline::feed(InputIt grids_begin, InputIt grids_end)
 {
-  static_assert(std::is_assignable<nav_msgs::OccupancyGrid::ConstPtr&,
+  static_assert(std::is_assignable<nav_msgs::OccupancyGrid::ConstPtr &,
                                    decltype(*grids_begin)>::value,
                 "grids_begin must point to nav_msgs::OccupancyGrid::ConstPtr "
                 "data");
@@ -89,7 +96,7 @@ void MergingPipeline::feed(InputIt grids_begin, InputIt grids_end)
       /* convert to opencv images. it creates only a view for opencv and does
        * not copy or own actual data. */
       images_.emplace_back((*it)->info.height, (*it)->info.width, CV_8UC1,
-                           const_cast<signed char*>((*it)->data.data()));
+                           const_cast<signed char *>((*it)->data.data()));
     } else {
       grids_.emplace_back();
       images_.emplace_back();
@@ -101,14 +108,14 @@ template <typename InputIt>
 bool MergingPipeline::setTransforms(InputIt transforms_begin,
                                     InputIt transforms_end)
 {
-  static_assert(std::is_assignable<geometry_msgs::Transform&,
+  static_assert(std::is_assignable<geometry_msgs::Transform &,
                                    decltype(*transforms_begin)>::value,
                 "transforms_begin must point to geometry_msgs::Transform "
                 "data");
 
   decltype(transforms_) transforms_buf;
   for (InputIt it = transforms_begin; it != transforms_end; ++it) {
-    const geometry_msgs::Quaternion& q = it->rotation;
+    const geometry_msgs::Quaternion &q = it->rotation;
     if ((q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w) <
         std::numeric_limits<double>::epsilon()) {
       // represents invalid transform

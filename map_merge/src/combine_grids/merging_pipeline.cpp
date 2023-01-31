@@ -47,6 +47,64 @@
 
 namespace combine_grids
 {
+
+void MergingPipeline::modifyTransformsBasedOnOrigins(
+    std::vector<cv::Mat> transforms, std::vector<cv::Mat>& out,
+    std::vector<cv::Point2d> map_origins, std::vector<float> resolutions)
+{
+  size_t identity_index = -1;
+  const double ZERO_ERROR = 0.0001;
+  for (size_t k = 0; k < transforms.size(); ++k) {
+    if (abs(transforms[k].at<double>(0, 0) - 1.0) < ZERO_ERROR &&
+        abs(transforms[k].at<double>(0, 1) - 0.0) < ZERO_ERROR &&
+        abs(transforms[k].at<double>(0, 2) - 0.0) < ZERO_ERROR &&
+        abs(transforms[k].at<double>(1, 0) - 0.0) < ZERO_ERROR &&
+        abs(transforms[k].at<double>(1, 1) - 1.0) < ZERO_ERROR &&
+        abs(transforms[k].at<double>(1, 2) - 0.0) < ZERO_ERROR &&
+        abs(transforms[k].at<double>(2, 0) - 0.0) < ZERO_ERROR &&
+        abs(transforms[k].at<double>(2, 1) - 0.0) < ZERO_ERROR &&
+        abs(transforms[k].at<double>(2, 2) - 1.0) < ZERO_ERROR) {
+      identity_index = k;
+    }
+  }
+
+  out.clear();
+  out.reserve(transforms.size());
+
+  double src_map_origin_x = map_origins[identity_index].x;
+  double src_map_origin_y = map_origins[identity_index].y;
+  float src_resolution = resolutions[identity_index];
+  for (size_t i = 0; i < transforms.size(); ++i) {
+    double dst_map_origin_x = map_origins[i].x;
+    double dst_map_origin_y = map_origins[i].y;
+    float dst_resolution = resolutions[i];
+
+    cv::Mat t1(3, 3, CV_64F);
+    t1.at<double>(0, 0) = 1.0;
+    t1.at<double>(0, 1) = 0.0;
+    t1.at<double>(0, 2) = src_map_origin_x / src_resolution;
+    t1.at<double>(1, 0) = 0.0;
+    t1.at<double>(1, 1) = 1.0;
+    t1.at<double>(1, 2) = src_map_origin_y / src_resolution;
+    t1.at<double>(2, 0) = 0.0;
+    t1.at<double>(2, 1) = 0.0;
+    t1.at<double>(2, 2) = 1.0;
+
+    cv::Mat t2(3, 3, CV_64F);
+    t2.at<double>(0, 0) = 1.0;
+    t2.at<double>(0, 1) = 0.0;
+    t2.at<double>(0, 2) = -1 * dst_map_origin_x / dst_resolution;
+    t2.at<double>(1, 0) = 0.0;
+    t2.at<double>(1, 1) = 1.0;
+    t2.at<double>(1, 2) = -1 * dst_map_origin_y / dst_resolution;
+    t2.at<double>(2, 0) = 0.0;
+    t2.at<double>(2, 1) = 0.0;
+    t2.at<double>(2, 2) = 1.0;
+
+    out.emplace_back(t2 * transforms[i] * t1);
+  }
+}
+
 bool MergingPipeline::estimateTransforms(FeatureType feature_type,
                                          double confidence)
 {
@@ -212,6 +270,11 @@ nav_msgs::OccupancyGrid::Ptr MergingPipeline::composeGrids()
   result->info.origin.orientation.w = 1.0;
 
   return result;
+}
+
+void MergingPipeline::setCvTransforms(std::vector<cv::Mat> transforms)
+{
+  transforms_ = transforms;
 }
 
 std::vector<geometry_msgs::Transform> MergingPipeline::getTransforms() const
