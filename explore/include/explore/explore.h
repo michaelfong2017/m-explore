@@ -147,6 +147,7 @@ private:
   double current_src_map_origin_y_;
   double current_dst_map_origin_x_;
   double current_dst_map_origin_y_;
+  bool current_second_traceback_;
   int64_t current_traced_robot_stamp_;
 
   // parameters

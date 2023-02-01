@@ -383,6 +383,7 @@ void Explore::sendResultToTraceback(bool aborted)
 {
   traceback_msgs::ImageAndImage images;
   images.aborted = aborted;
+  images.second_traceback = current_second_traceback_;
   images.traced_image = current_traced_robot_image_;
   images.tracer_image = current_image_;
   images.tracer_robot = current_tracer_robot_;
@@ -391,7 +392,8 @@ void Explore::sendResultToTraceback(bool aborted)
   images.src_map_origin_y = current_src_map_origin_y_;
   images.dst_map_origin_x = current_dst_map_origin_x_;
   images.dst_map_origin_y = current_dst_map_origin_y_;
-  images.goal = current_traceback_goal_;
+  images.arrived_pose = costmap_client_.getRobotPose();
+  
   images.stamp = current_traced_robot_stamp_;
   traceback_image_and_image_publisher_.publish(images);
 }
@@ -415,6 +417,7 @@ void Explore::tracebackGoalAndImageUpdate(
   current_src_map_origin_y_ = msg->src_map_origin_y;
   current_dst_map_origin_x_ = msg->dst_map_origin_x;
   current_dst_map_origin_y_ = msg->dst_map_origin_y;
+  current_second_traceback_ = msg->second_traceback;
   current_traced_robot_stamp_ = msg->stamp;
 
   doTraceback(current_traceback_goal_);
