@@ -115,6 +115,12 @@ Explore::Explore()
       [this](const sensor_msgs::ImageConstPtr& msg) {
         CameraImageUpdate(msg);
       });
+
+  robot_camera_point_cloud_subscriber_ = private_nh_.subscribe<sensor_msgs::PointCloud2>(
+      ros::names::append(getRobotName(), robot_camera_point_cloud_topic_), 50,
+      [this](const sensor_msgs::PointCloud2ConstPtr& msg) {
+        CameraPointCloudUpdate(msg);
+      });
 }
 
 Explore::~Explore()
@@ -386,6 +392,8 @@ void Explore::sendResultToTraceback(bool aborted)
   images.second_traceback = current_second_traceback_;
   images.traced_image = current_traced_robot_image_;
   images.tracer_image = current_image_;
+  images.traced_point_cloud = current_traced_robot_point_cloud_;
+  images.tracer_point_cloud = current_point_cloud_;
   images.tracer_robot = current_tracer_robot_;
   images.traced_robot = current_traced_robot_;
   images.src_map_origin_x = current_src_map_origin_x_;
@@ -411,6 +419,7 @@ void Explore::tracebackGoalAndImageUpdate(
 
   current_traceback_goal_ = msg->goal;
   current_traced_robot_image_ = msg->image;
+  current_traced_robot_point_cloud_ = msg->point_cloud;
   current_tracer_robot_ = msg->tracer_robot;
   current_traced_robot_ = msg->traced_robot;
   current_src_map_origin_x_ = msg->src_map_origin_x;
@@ -425,7 +434,13 @@ void Explore::tracebackGoalAndImageUpdate(
 
 void Explore::CameraImageUpdate(const sensor_msgs::ImageConstPtr& msg)
 {
-  current_image_ = *msg;
+  temp_image_ = *msg;
+}
+
+void Explore::CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr& msg)
+{
+  current_point_cloud_ = *msg;
+  current_image_ = temp_image_;
 }
 
 void Explore::resumeNormalExplorationLater(int32_t second)
