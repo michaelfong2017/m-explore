@@ -366,10 +366,10 @@ void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal)
   //     sqrt(pow((double(pose.position.x) - double(target_position.x)), 2.0) +
   //          pow((double(pose.position.y) - double(target_position.y)), 2.0));
 
-  // Cancel the goal after 30 seconds, which is the timeou
+  // Cancel the goal after some seconds, which is the timeout
   // Also blacklist the goal
   // Second traceback only goes to a nearby goal.
-  int traceback_timeout = current_second_traceback_ ? 15 : 30;
+  int traceback_timeout = current_second_traceback_ ? 30 : 30;
   traceback_timeout_timer_ = relative_nh_.createTimer(
       ros::Duration(traceback_timeout, 0),
       [this, target_position, traceback_timeout](const ros::TimerEvent&) {
