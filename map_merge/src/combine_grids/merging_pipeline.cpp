@@ -49,8 +49,8 @@ namespace combine_grids
 {
 
 void MergingPipeline::modifyTransformsBasedOnOrigins(
-    std::vector<cv::Mat> transforms, std::vector<cv::Mat>& out,
-    std::vector<cv::Point2d> map_origins, std::vector<float> resolutions)
+    std::vector<cv::Mat>& transforms, std::vector<cv::Mat>& out,
+    std::vector<cv::Point2d>& map_origins, std::vector<float>& resolutions)
 {
   size_t identity_index = -1;
   const double ZERO_ERROR = 0.0001;
@@ -66,6 +66,11 @@ void MergingPipeline::modifyTransformsBasedOnOrigins(
         abs(transforms[k].at<double>(2, 2) - 1.0) < ZERO_ERROR) {
       identity_index = k;
     }
+  }
+
+  if (identity_index == -1)
+  {
+    return;
   }
 
   out.clear();
@@ -103,6 +108,7 @@ void MergingPipeline::modifyTransformsBasedOnOrigins(
 
     out.emplace_back(t2 * transforms[i] * t1);
   }
+
 }
 
 bool MergingPipeline::estimateTransforms(FeatureType feature_type,

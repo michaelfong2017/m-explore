@@ -56,11 +56,10 @@ class MergingPipeline
 public:
   template <typename InputIt>
   void feed(InputIt grids_begin, InputIt grids_end);
-
-  void modifyTransformsBasedOnOrigins(std::vector<cv::Mat> transforms,
+  void modifyTransformsBasedOnOrigins(std::vector<cv::Mat> &transforms,
                                       std::vector<cv::Mat> &out,
-                                      std::vector<cv::Point2d> map_origins,
-                                      std::vector<float> resolutions);
+                                      std::vector<cv::Point2d> &map_origins,
+                                      std::vector<float> &resolutions);
 
   bool estimateTransforms(FeatureType feature = FeatureType::AKAZE,
                           double confidence = 1.0);

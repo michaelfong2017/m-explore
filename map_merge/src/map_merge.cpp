@@ -200,21 +200,57 @@ void MapMerge::mapMerging()
         std::lock_guard<std::mutex> s_lock(subscription.mutex);
         grids.push_back(subscription.readonly_map);
         transforms.push_back(subscription.initial_pose);
-        map_origins.push_back(
+        map_origins.emplace_back(
             cv::Point2d(subscription.readonly_map->info.origin.position.x,
                         subscription.readonly_map->info.origin.position.y));
         resolutions.push_back(subscription.readonly_map->info.resolution);
       }
     }
 
-    // TODO
-    // pipeline_.modifyTransformsBasedOnOrigins(transforms, map_origins,
-    //                                          resolutions);
+    current_traceback_transforms_.clear();
+    for (size_t i = 0; i < transforms.size(); ++i) {
+      double x = transforms[i].translation.x;
+      double y = transforms[i].translation.y;
+      tf2::Quaternion tf_q;
+      tf2::fromMsg(transforms[i].rotation, tf_q);
+      tf2::Matrix3x3 m(tf_q);
+      double roll, pitch, yaw;
+      m.getRPY(roll, pitch, yaw);
+
+      cv::Mat t_global_i(3, 3, CV_64F);
+      t_global_i.at<double>(0, 0) = cos(-1 * yaw);
+      t_global_i.at<double>(0, 1) = -sin(-1 * yaw);
+      t_global_i.at<double>(0, 2) = -1 * x / resolutions[i];
+      t_global_i.at<double>(1, 0) = sin(-1 * yaw);
+      t_global_i.at<double>(1, 1) = cos(-1 * yaw);
+      t_global_i.at<double>(1, 2) = -1 * y / resolutions[i];
+      t_global_i.at<double>(2, 0) = 0.0;
+      t_global_i.at<double>(2, 1) = 0.0;
+      t_global_i.at<double>(2, 2) = 1;
+
+      current_traceback_transforms_.push_back(t_global_i);
+    }
+    std::vector<cv::Mat> temp;
+    for (size_t i = 0; i < transforms.size(); ++i) {
+      if (i == 0) {
+        temp.emplace_back(cv::Mat::eye(3, 3, CV_64F));
+      }
+      // e.g. 0->1 = t_global_1 * inv(t_global_0)
+      else {
+        temp.push_back(current_traceback_transforms_[i] *
+                       current_traceback_transforms_[0].inv());
+      }
+    }
+    current_traceback_transforms_ = temp;
+
+    pipeline_.modifyTransformsBasedOnOrigins(current_traceback_transforms_,
+                                             modified_traceback_transforms_,
+                                             map_origins, resolutions);
 
     // we don't need to lock here, because when have_initial_poses_ is true we
     // will not run concurrently on the pipeline
     pipeline_.feed(grids.begin(), grids.end());
-    pipeline_.setTransforms(transforms.begin(), transforms.end());
+    pipeline_.setCvTransforms(modified_traceback_transforms_);
   }
 
   nav_msgs::OccupancyGridPtr merged_map;
