@@ -116,11 +116,12 @@ Explore::Explore()
         CameraImageUpdate(msg);
       });
 
-  robot_camera_point_cloud_subscriber_ = private_nh_.subscribe<sensor_msgs::PointCloud2>(
-      ros::names::append(getRobotName(), robot_camera_point_cloud_topic_), 50,
-      [this](const sensor_msgs::PointCloud2ConstPtr& msg) {
-        CameraPointCloudUpdate(msg);
-      });
+  robot_camera_point_cloud_subscriber_ =
+      private_nh_.subscribe<sensor_msgs::PointCloud2>(
+          ros::names::append(getRobotName(), robot_camera_point_cloud_topic_),
+          50, [this](const sensor_msgs::PointCloud2ConstPtr& msg) {
+            CameraPointCloudUpdate(msg);
+          });
 }
 
 Explore::~Explore()
@@ -357,7 +358,19 @@ void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal)
   if (goalOnBlacklist(target_position)) {
     ROS_DEBUG("traceback goal is on blacklist");
     move_base_client_.cancelGoal();
-    // Then, process in the callback function
+    // Then, process here
+
+    // May cause duplication
+    frontier_blacklist_.push_back(target_position);
+    ROS_DEBUG("Adding current traceback goal to black list");
+    // Wait 1 second in order to collect a correct image at the goal
+    traceback_oneshot_ = relative_nh_.createTimer(
+        ros::Duration(1, 0),
+        [this](const ros::TimerEvent&) { sendResultToTraceback(true); }, true);
+
+    // Wait for some time for Traceback to process (continue traceback),
+    // If no message is sent after 3 seconds, resume to normal exploration
+    resumeNormalExplorationLater(3);
   }
 
   // auto pose = costmap_client_.getRobotPose();
@@ -369,13 +382,27 @@ void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal)
   // Cancel the goal after some seconds, which is the timeout
   // Also blacklist the goal
   // Second traceback only goes to a nearby goal.
-  int traceback_timeout = current_second_traceback_ ? 45 : 90;
+  int traceback_timeout = current_second_traceback_ ? 45 : 75;
   traceback_timeout_timer_ = relative_nh_.createTimer(
       ros::Duration(traceback_timeout, 0),
       [this, target_position, traceback_timeout](const ros::TimerEvent&) {
-        ROS_DEBUG("Cancelling traceback goal after %d seconds", traceback_timeout);
+        ROS_DEBUG("Cancelling traceback goal after %d seconds",
+                  traceback_timeout);
         move_base_client_.cancelGoal();
-        // Then, process in the callback function
+        // Then, process here
+
+        // May cause duplication
+        frontier_blacklist_.push_back(target_position);
+        ROS_DEBUG("Adding current traceback goal to black list");
+        // Wait 1 second in order to collect a correct image at the goal
+        traceback_oneshot_ = relative_nh_.createTimer(
+            ros::Duration(1, 0),
+            [this](const ros::TimerEvent&) { sendResultToTraceback(true); },
+            true);
+
+        // Wait for some time for Traceback to process (continue traceback),
+        // If no message is sent after 3 seconds, resume to normal exploration
+        resumeNormalExplorationLater(3);
       },
       true);
 
@@ -403,7 +430,7 @@ void Explore::sendResultToTraceback(bool aborted)
   images.dst_map_origin_x = current_dst_map_origin_x_;
   images.dst_map_origin_y = current_dst_map_origin_y_;
   images.arrived_pose = costmap_client_.getRobotPose();
-  
+
   images.stamp = current_traced_robot_stamp_;
   traceback_image_and_image_publisher_.publish(images);
 }
@@ -414,7 +441,8 @@ void Explore::tracebackGoalAndImageUpdate(
   ROS_INFO("tracebackGoalAndImageUpdate");
   cancelResumeNormalExplorationLater();
 
-  // TODO currently, in_traceback_ is set back to false only 30 seconds after sendGoal callback received
+  // TODO currently, in_traceback_ is set back to false only 30 seconds after
+  // sendGoal callback received
   if (!in_traceback_) {
     in_traceback_ = true;
   }
@@ -492,26 +520,17 @@ void Explore::reachedTracebackGoal(
 {
   ROS_DEBUG("Traceback reached goal with status: %s",
             status.toString().c_str());
+
   if (status == actionlib::SimpleClientGoalState::SUCCEEDED) {
     // Wait 1 second in order to collect a correct image at the goal
     traceback_oneshot_ = relative_nh_.createTimer(
         ros::Duration(1, 0),
         [this](const ros::TimerEvent&) { sendResultToTraceback(false); }, true);
-  }
 
-  else {
-    // May cause duplication
-    frontier_blacklist_.push_back(traceback_goal.target_pose.pose.position);
-    ROS_DEBUG("Adding current traceback goal to black list");
-    // Wait 1 second in order to collect a correct image at the goal
-    traceback_oneshot_ = relative_nh_.createTimer(
-        ros::Duration(1, 0),
-        [this](const ros::TimerEvent&) { sendResultToTraceback(true); }, true);
+    // Wait for some time for Traceback to process (continue traceback),
+    // If no message is sent after 3 seconds, resume to normal exploration
+    resumeNormalExplorationLater(3);
   }
-
-  // Wait for some time for Traceback to process (continue traceback),
-  // If no message is sent after 3 seconds, resume to normal exploration
-  resumeNormalExplorationLater(3);
 }
 
 void Explore::start()
