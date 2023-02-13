@@ -349,7 +349,7 @@ bool Explore::goalOnBlacklist(const geometry_msgs::Point& goal)
   return false;
 }
 
-void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal)
+void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal, int abort_timeout)
 {
   ROS_DEBUG("\n\ndoTraceback\n%d\n", ros::Time::now().sec);
 
@@ -382,7 +382,7 @@ void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal)
   // Cancel the goal after some seconds, which is the timeout
   // Also blacklist the goal
   // Second traceback only goes to a nearby goal.
-  int traceback_timeout = current_second_traceback_ ? 45 : 75;
+  int traceback_timeout = current_second_traceback_ ? abort_timeout : abort_timeout;
   traceback_timeout_timer_ = relative_nh_.createTimer(
       ros::Duration(traceback_timeout, 0),
       [this, target_position, traceback_timeout](const ros::TimerEvent&) {
@@ -459,7 +459,7 @@ void Explore::tracebackGoalAndImageUpdate(
   current_second_traceback_ = msg->second_traceback;
   current_traced_robot_stamp_ = msg->stamp;
 
-  doTraceback(current_traceback_goal_);
+  doTraceback(current_traceback_goal_, msg->abort_timeout);
 }
 
 void Explore::CameraImageUpdate(const sensor_msgs::ImageConstPtr& msg)

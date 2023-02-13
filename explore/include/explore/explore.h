@@ -98,7 +98,7 @@ private:
 
   ros::Timer traceback_timeout_timer_;
   ros::Timer traceback_oneshot_;
-  void doTraceback(move_base_msgs::MoveBaseGoal goal);
+  void doTraceback(move_base_msgs::MoveBaseGoal goal, int abort_timeout);
 
   void sendResultToTraceback(bool aborted);
 
