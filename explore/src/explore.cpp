@@ -355,23 +355,23 @@ void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal, int abort_timeout)
 
   geometry_msgs::Point target_position = goal.target_pose.pose.position;
 
-  if (goalOnBlacklist(target_position)) {
-    ROS_DEBUG("traceback goal is on blacklist");
-    move_base_client_.cancelGoal();
-    // Then, process here
+  // if (goalOnBlacklist(target_position)) {
+  //   ROS_DEBUG("traceback goal is on blacklist");
+  //   move_base_client_.cancelGoal();
+  //   // Then, process here
 
-    // May cause duplication
-    frontier_blacklist_.push_back(target_position);
-    ROS_DEBUG("Adding current traceback goal to black list");
-    // Wait 1 second in order to collect a correct image at the goal
-    traceback_oneshot_ = relative_nh_.createTimer(
-        ros::Duration(1, 0),
-        [this](const ros::TimerEvent&) { sendResultToTraceback(true); }, true);
+  //   // May cause duplication
+  //   frontier_blacklist_.push_back(target_position);
+  //   ROS_DEBUG("Adding current traceback goal to black list");
+  //   // Wait 1 second in order to collect a correct image at the goal
+  //   traceback_oneshot_ = relative_nh_.createTimer(
+  //       ros::Duration(1, 0),
+  //       [this](const ros::TimerEvent&) { sendResultToTraceback(true); }, true);
 
-    // Wait for some time for Traceback to process (continue traceback),
-    // If no message is sent after 3 seconds, resume to normal exploration
-    resumeNormalExplorationLater(3);
-  }
+  //   // Wait for some time for Traceback to process (continue traceback),
+  //   // If no message is sent after 3 seconds, resume to normal exploration
+  //   resumeNormalExplorationLater(3);
+  // }
 
   // auto pose = costmap_client_.getRobotPose();
 
@@ -392,8 +392,8 @@ void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal, int abort_timeout)
         // Then, process here
 
         // May cause duplication
-        frontier_blacklist_.push_back(target_position);
-        ROS_DEBUG("Adding current traceback goal to black list");
+        // frontier_blacklist_.push_back(target_position);
+        // ROS_DEBUG("Adding current traceback goal to black list");
         // Wait 1 second in order to collect a correct image at the goal
         traceback_oneshot_ = relative_nh_.createTimer(
             ros::Duration(1, 0),
