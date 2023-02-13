@@ -522,6 +522,8 @@ void Explore::reachedTracebackGoal(
             status.toString().c_str());
 
   if (status == actionlib::SimpleClientGoalState::SUCCEEDED) {
+    traceback_timeout_timer_.stop();
+
     // Wait 1 second in order to collect a correct image at the goal
     traceback_oneshot_ = relative_nh_.createTimer(
         ros::Duration(1, 0),
