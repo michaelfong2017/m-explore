@@ -106,7 +106,8 @@ private:
       const traceback_msgs::GoalAndImage::ConstPtr& msg);
 
   void CameraImageUpdate(const sensor_msgs::ImageConstPtr& msg);
-  void CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr& msg);
+  void CameraDepthImageUpdate(const sensor_msgs::ImageConstPtr& msg);
+  // void CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr& msg);
 
   ros::NodeHandle private_nh_;
   ros::NodeHandle relative_nh_;
@@ -131,9 +132,12 @@ private:
   ros::Subscriber robot_camera_image_subscriber_;
   std::string robot_camera_image_topic_ = "camera/rgb/image_raw";
   sensor_msgs::Image current_image_;
+  ros::Subscriber robot_camera_depth_image_subscriber_;
+  std::string robot_camera_depth_image_topic_ = "camera/depth/image_raw";
+  sensor_msgs::Image current_depth_image_;
   ros::Subscriber robot_camera_point_cloud_subscriber_;
   std::string robot_camera_point_cloud_topic_ = "camera/depth/points";
-  sensor_msgs::PointCloud2 current_point_cloud_;
+  // sensor_msgs::PointCloud2 current_point_cloud_;
 
   ros::Subscriber traceback_goal_and_image_subscriber_;
   std::string traceback_goal_and_image_topic_ = "traceback/goal_and_image";
@@ -147,7 +151,8 @@ private:
 
   move_base_msgs::MoveBaseGoal current_traceback_goal_;
   sensor_msgs::Image current_traced_robot_image_;
-  sensor_msgs::PointCloud2 current_traced_robot_point_cloud_;
+  sensor_msgs::Image current_traced_robot_depth_image_;
+  // sensor_msgs::PointCloud2 current_traced_robot_point_cloud_;
   std::string current_tracer_robot_;
   std::string current_traced_robot_;
   double current_src_map_origin_x_;

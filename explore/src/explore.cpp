@@ -116,12 +116,18 @@ Explore::Explore()
         CameraImageUpdate(msg);
       });
 
-  robot_camera_point_cloud_subscriber_ =
-      private_nh_.subscribe<sensor_msgs::PointCloud2>(
-          ros::names::append(getRobotName(), robot_camera_point_cloud_topic_),
-          50, [this](const sensor_msgs::PointCloud2ConstPtr& msg) {
-            CameraPointCloudUpdate(msg);
-          });
+  robot_camera_depth_image_subscriber_ = private_nh_.subscribe<sensor_msgs::Image>(
+      ros::names::append(getRobotName(), robot_camera_depth_image_topic_), 50,
+      [this](const sensor_msgs::ImageConstPtr& msg) {
+        CameraDepthImageUpdate(msg);
+      });
+
+  // robot_camera_point_cloud_subscriber_ =
+  //     private_nh_.subscribe<sensor_msgs::PointCloud2>(
+  //         ros::names::append(getRobotName(), robot_camera_point_cloud_topic_),
+  //         50, [this](const sensor_msgs::PointCloud2ConstPtr& msg) {
+  //           CameraPointCloudUpdate(msg);
+  //         });
 }
 
 Explore::~Explore()
@@ -334,7 +340,7 @@ void Explore::makePlan()
 
 bool Explore::goalOnBlacklist(const geometry_msgs::Point& goal)
 {
-  constexpr static size_t tolerace = 5;
+  constexpr static size_t tolerace = 2;
   costmap_2d::Costmap2D* costmap2d = costmap_client_.getCostmap();
 
   // check if a goal is on the blacklist for goals that we're pursuing
@@ -421,8 +427,10 @@ void Explore::sendResultToTraceback(bool aborted)
   images.second_traceback = current_second_traceback_;
   images.traced_image = current_traced_robot_image_;
   images.tracer_image = current_image_;
-  images.traced_point_cloud = current_traced_robot_point_cloud_;
-  images.tracer_point_cloud = current_point_cloud_;
+  images.traced_depth_image = current_traced_robot_depth_image_;
+  images.tracer_depth_image = current_depth_image_;
+  // images.traced_point_cloud = current_traced_robot_point_cloud_;
+  // images.tracer_point_cloud = current_point_cloud_;
   images.tracer_robot = current_tracer_robot_;
   images.traced_robot = current_traced_robot_;
   images.src_map_origin_x = current_src_map_origin_x_;
@@ -449,7 +457,8 @@ void Explore::tracebackGoalAndImageUpdate(
 
   current_traceback_goal_ = msg->goal;
   current_traced_robot_image_ = msg->image;
-  current_traced_robot_point_cloud_ = msg->point_cloud;
+  current_traced_robot_depth_image_ = msg->depth_image;
+  // current_traced_robot_point_cloud_ = msg->point_cloud;
   current_tracer_robot_ = msg->tracer_robot;
   current_traced_robot_ = msg->traced_robot;
   current_src_map_origin_x_ = msg->src_map_origin_x;
@@ -467,11 +476,17 @@ void Explore::CameraImageUpdate(const sensor_msgs::ImageConstPtr& msg)
   temp_image_ = *msg;
 }
 
-void Explore::CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr& msg)
+void Explore::CameraDepthImageUpdate(const sensor_msgs::ImageConstPtr& msg)
 {
-  current_point_cloud_ = *msg;
+  current_depth_image_ = *msg;
   current_image_ = temp_image_;
 }
+
+// void Explore::CameraPointCloudUpdate(const sensor_msgs::PointCloud2ConstPtr& msg)
+// {
+//   current_point_cloud_ = *msg;
+//   current_image_ = temp_image_;
+// }
 
 void Explore::resumeNormalExplorationLater(int32_t second)
 {
