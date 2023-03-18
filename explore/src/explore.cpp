@@ -387,8 +387,7 @@ void Explore::doTraceback(move_base_msgs::MoveBaseGoal goal, int abort_timeout)
 
   // Cancel the goal after some seconds, which is the timeout
   // Also blacklist the goal
-  // Second traceback only goes to a nearby goal.
-  int traceback_timeout = current_second_traceback_ ? abort_timeout : abort_timeout;
+  int traceback_timeout = abort_timeout;
   traceback_timeout_timer_ = relative_nh_.createTimer(
       ros::Duration(traceback_timeout, 0),
       [this, target_position, traceback_timeout](const ros::TimerEvent&) {
@@ -424,13 +423,10 @@ void Explore::sendResultToTraceback(bool aborted)
 {
   traceback_msgs::ImageAndImage images;
   images.aborted = aborted;
-  images.second_traceback = current_second_traceback_;
   images.traced_image = current_traced_robot_image_;
   images.tracer_image = current_image_;
   images.traced_depth_image = current_traced_robot_depth_image_;
   images.tracer_depth_image = current_depth_image_;
-  // images.traced_point_cloud = current_traced_robot_point_cloud_;
-  // images.tracer_point_cloud = current_point_cloud_;
   images.tracer_robot = current_tracer_robot_;
   images.traced_robot = current_traced_robot_;
   images.src_map_origin_x = current_src_map_origin_x_;
@@ -458,14 +454,12 @@ void Explore::tracebackGoalAndImageUpdate(
   current_traceback_goal_ = msg->goal;
   current_traced_robot_image_ = msg->image;
   current_traced_robot_depth_image_ = msg->depth_image;
-  // current_traced_robot_point_cloud_ = msg->point_cloud;
   current_tracer_robot_ = msg->tracer_robot;
   current_traced_robot_ = msg->traced_robot;
   current_src_map_origin_x_ = msg->src_map_origin_x;
   current_src_map_origin_y_ = msg->src_map_origin_y;
   current_dst_map_origin_x_ = msg->dst_map_origin_x;
   current_dst_map_origin_y_ = msg->dst_map_origin_y;
-  current_second_traceback_ = msg->second_traceback;
   current_traced_robot_stamp_ = msg->stamp;
 
   doTraceback(current_traceback_goal_, msg->abort_timeout);

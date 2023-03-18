@@ -152,14 +152,12 @@ private:
   move_base_msgs::MoveBaseGoal current_traceback_goal_;
   sensor_msgs::Image current_traced_robot_image_;
   sensor_msgs::Image current_traced_robot_depth_image_;
-  // sensor_msgs::PointCloud2 current_traced_robot_point_cloud_;
   std::string current_tracer_robot_;
   std::string current_traced_robot_;
   double current_src_map_origin_x_;
   double current_src_map_origin_y_;
   double current_dst_map_origin_x_;
   double current_dst_map_origin_y_;
-  bool current_second_traceback_;
   int64_t current_traced_robot_stamp_;
 
   // parameters
