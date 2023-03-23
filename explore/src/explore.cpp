@@ -41,10 +41,8 @@
 #include <thread>
 
 #include "geometry_msgs/Pose.h"
-#include "mongodb_store/message_store.h"
 
 using namespace geometry_msgs;
-using namespace mongodb_store;
 using namespace std;
 
 inline static bool operator==(const geometry_msgs::Point& one,
