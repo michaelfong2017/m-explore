@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   traceback_msgs
   visualization_msgs
-  mongodb_store
 )
 
 ###################################
@@ -34,7 +33,6 @@ catkin_package(
     std_msgs
     tf
     visualization_msgs
-    mongodb_store
 )
 
 ###########
